@@ -12,6 +12,22 @@
 #include "Handler.hpp"
 #define BUFFER_SIZE 128
 
+void processRequest(int fd, const RESPElement& requestArr, Handler & handler) {
+    std::vector<RESPElement> requestArray = requestArr.array;
+    if (requestArray.empty()) return;
+
+    std::string command = requestArray[0].value;
+    if (command == "SET") {
+        handler.handleSet(fd, requestArray);
+    } else if (command == "GET") {
+        handler.handleGet(fd, requestArray);
+    } else if (command == "EXISTS") {
+        handler.handleExists(fd, requestArray);
+    } else {
+        std::string response = "-ERR unknown command\r\n";
+        send(fd, response.c_str(), response.length(), 0);
+    }
+}
 
 void handle_requests(int fd)
 {
@@ -36,7 +52,7 @@ void handle_requests(int fd)
           RESPElement request = parser.parse(buffer);
           if (request.type == RESPType::Array && !request.array.empty()) {
               std::string command = request.array[0].value; // First element is the command
-              // processRequest(fd, request, handler);
+              processRequest(fd, request, handler);
               buffer.clear();
           }
         } 
