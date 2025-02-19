@@ -87,3 +87,54 @@ void Handler::handleDel(int fd, const std::vector<RESPElement>& requestArray) {
     }
 }
 
+void Handler::handleIncr(int fd, const std::vector<RESPElement>& requestArray) {
+    try {
+        if (requestArray.size() != 2) {
+            throw std::runtime_error("Invalid INCR command format");
+        }
+
+        std::string key = requestArray[1].value;
+        auto it = database.find(key);
+
+        if (it != database.end()) {
+            int64_t value = std::stoll(it->second);
+            value++;
+            it->second = std::to_string(value);
+        } else {
+            database[key] = "1";
+        }
+
+        std::string response = ":" + database[key] + "\r\n";
+        send(fd, response.c_str(), response.length(), 0);
+    }
+    catch (const std::exception& e) {
+        std::string error_response = "-Error: " + std::string(e.what()) + "\r\n";
+        send(fd, error_response.c_str(), error_response.length(), 0);
+    }
+}
+
+void Handler::handleDecr(int fd, const std::vector<RESPElement>& requestArray) {
+    try {
+        if (requestArray.size() != 2) {
+            throw std::runtime_error("Invalid DECR command format");
+        }
+
+        std::string key = requestArray[1].value;
+        auto it = database.find(key);
+
+        if (it != database.end()) {
+            int64_t value = std::stoll(it->second);
+            value--;
+            it->second = std::to_string(value);
+        } else {
+            database[key] = "-1";
+        }
+
+        std::string response = ":" + database[key] + "\r\n";
+        send(fd, response.c_str(), response.length(), 0);
+    }
+    catch (const std::exception& e) {
+        std::string error_response = "-Error: " + std::string(e.what()) + "\r\n";
+        send(fd, error_response.c_str(), error_response.length(), 0);
+    }
+}

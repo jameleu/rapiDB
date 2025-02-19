@@ -25,6 +25,10 @@ void processRequest(int fd, const RESPElement& requestArr, Handler & handler) {
         handler.handleExists(fd, requestArray);
     } else if (command == "DEL") {
         handler.handleDel(fd, requestArray);
+    } else if (command == "INCR") {
+        handler.handleIncr(fd, requestArray);
+    } else if (command == "DECR") {
+        handler.handleDecr(fd, requestArray);
     } else {
         std::string response = "-ERR unknown command\r\n";
         send(fd, response.c_str(), response.length(), 0);

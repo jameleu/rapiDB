@@ -14,7 +14,8 @@ public:
     void handleGet(int fd, const std::vector<RESPElement>& requestArray);
     void handleExists(int fd, const std::vector<RESPElement>& requestArray);
     void handleDel(int fd, const std::vector<RESPElement>& requestArray);
-
+    void handleIncr(int fd, const std::vector<RESPElement>& requestArray);
+    void handleDecr(int fd, const std::vector<RESPElement>& requestArray);
 
 private:
     std::unordered_map<std::string, std::string> database;
