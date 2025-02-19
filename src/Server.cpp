@@ -8,29 +8,22 @@
 #include <sys/socket.h>
 #include <arpa/inet.h>
 #include <netdb.h>
+#include "resp_parser.hpp"
+#include "Handler.hpp"
 #define BUFFER_SIZE 128
-#define ECHO_HEADER_SIZE 14
 
-std::string get_arg(std::string buffer, int header_size)
-{
-  std::string remainder = buffer.substr(header_size);  // skip header content
-    size_t pos = remainder.find("\r\n");
-    if (pos != std::string::npos)
-    {
-        // exclude \r\n
-        std::string message = remainder.substr(pos + 2);  // get msg that has resp still
-        return message;
-    }
-    return "";
-}
+
 void handle_requests(int fd)
 {
+  Handler handler;
+  RESPParser parser;
   std::string buffer;  // dynamic buffer so can receive longer messages
   char temp[BUFFER_SIZE]; // temporary buffer for immediate receive with recv
   while (true)
   {
     memset(temp, 0, sizeof(temp));
     int bytes_received = recv(fd, temp, sizeof(temp)-1,0);
+
     if (bytes_received <= 0)
     {
       std::cerr << "Client disconnected or error occurred.\n";
@@ -39,19 +32,25 @@ void handle_requests(int fd)
     
     buffer.append(temp, bytes_received);
 
-    // RESP format
-    if (buffer.find("*1\r\n$4\r\nping\r\n") != std::string::npos)
-        {
-            send(fd, "+PONG\r\n", 7, 0);
-            buffer.clear(); 
+    try {
+          RESPElement request = parser.parse(buffer);
+          if (request.type == RESPType::Array && !request.array.empty()) {
+              std::string command = request.array[0].value; // First element is the command
+              // processRequest(fd, request, handler);
+              buffer.clear();
+          }
+        } 
+      catch (const std::exception& e) {
+        std::string errorMessage = e.what();
+        if (errorMessage.find("Incomplete") != std::string::npos) {
+            continue;  // wait for rest of msg
         }
-    else if (buffer.find("*2\r\n$4\r\necho\r\n") != std::string::npos)
-    {
-        std::string message = get_arg(buffer, ECHO_HEADER_SIZE);
-        send(fd, message.c_str(), message.length(), 0); 
-        buffer.clear(); 
-    }
-    
+        else {
+            std::cerr << "RESP Parsing Error: " << errorMessage << "\n";
+            send(fd, "-ERR invalid request\r\n", 22, 0);
+            buffer.clear();  // move on since parser will never decipher it
+        }
+      }
   }
 }
 int main(int argc, char **argv) {
@@ -94,7 +93,6 @@ int main(int argc, char **argv) {
 
   std::cout << "Client connected\n";
   // std::string pong = "+PONG\r\n";  // + is simple string in Redis, carriage return, new line
-
   while (true) {  // keep on creating thread per client that forms conn
     int client_fd = accept(server_fd, (struct sockaddr *) &client_addr, (socklen_t *) &client_addr_len);
     if (client_fd < 0) {
