@@ -3,11 +3,26 @@
 #include <string>
 #include <cstring>
 #include <unistd.h>
+#include <thread>
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <arpa/inet.h>
 #include <netdb.h>
 #define BUFFER_SIZE 128
+#define ECHO_HEADER_SIZE 14
+
+std::string get_arg(std::string buffer, int header_size)
+{
+  std::string remainder = buffer.substr(header_size);  // skip header content
+    size_t pos = remainder.find("\r\n");
+    if (pos != std::string::npos)
+    {
+        // exclude \r\n
+        std::string message = remainder.substr(pos + 2);  // get msg that has resp still
+        return message;
+    }
+    return "";
+}
 void handle_requests(int fd)
 {
   std::string buffer;  // dynamic buffer so can receive longer messages
@@ -24,12 +39,19 @@ void handle_requests(int fd)
     
     buffer.append(temp, bytes_received);
 
-    //if has ping, then send pong
-    size_t pos = buffer.find("*1\r\n$4\r\nping\r\n");
-    if (pos != std::string::npos) {
-        send(fd, "+PONG\r\n", 7, 0);
-        buffer.erase(0, pos + 14);  // Remove processed message
+    // RESP format
+    if (buffer.find("*1\r\n$4\r\nping\r\n") != std::string::npos)
+        {
+            send(fd, "+PONG\r\n", 7, 0);
+            buffer.clear(); 
+        }
+    else if (buffer.find("*2\r\n$4\r\necho\r\n") != std::string::npos)
+    {
+        std::string message = get_arg(buffer, ECHO_HEADER_SIZE);
+        send(fd, message.c_str(), message.length(), 0); 
+        buffer.clear(); 
     }
+    
   }
 }
 int main(int argc, char **argv) {
@@ -70,16 +92,21 @@ int main(int argc, char **argv) {
   int client_addr_len = sizeof(client_addr);
   std::cout << "Waiting for a client to connect...\n";
 
-  // get client file descriptor here
-  int client_fd = accept(server_fd, (struct sockaddr *) &client_addr, (socklen_t *) &client_addr_len);
-  if (client_fd < 0) {
-    std::cerr << "TCP Handshake failed\n";
-    return 1;
-  }
   std::cout << "Client connected\n";
-  std::string pong = "+PONG\r\n";  // + is simple string in Redis, carriage return, new line
-  
-  handle_requests(client_fd);
+  // std::string pong = "+PONG\r\n";  // + is simple string in Redis, carriage return, new line
+
+  while (true) {  // keep on creating thread per client that forms conn
+    int client_fd = accept(server_fd, (struct sockaddr *) &client_addr, (socklen_t *) &client_addr_len);
+    if (client_fd < 0) {
+      std::cerr << "TCP Handshake failed\n";
+      continue; 
+    }
+    std::cout << "Client connected\n";
+
+    std::thread client_thread(handle_requests, client_fd);
+    client_thread.detach();  // let it run independently
+  }
+
   close(server_fd);
 
   return 0;
