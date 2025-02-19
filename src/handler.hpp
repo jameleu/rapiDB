@@ -13,6 +13,7 @@ public:
     void handleSet(int fd, const std::vector<RESPElement>& requestArray);
     void handleGet(int fd, const std::vector<RESPElement>& requestArray);
     void handleExists(int fd, const std::vector<RESPElement>& requestArray);
+    void handleDel(int fd, const std::vector<RESPElement>& requestArray);
 
 
 private:

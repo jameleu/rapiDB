@@ -69,3 +69,21 @@ void Handler::handleExists(int fd, const std::vector<RESPElement>& requestArray)
         send(fd, error_response.c_str(), error_response.length(), 0);
     }
 }
+
+void Handler::handleDel(int fd, const std::vector<RESPElement>& requestArray) {
+    try {
+        if (requestArray.size() != 2) {
+            throw std::runtime_error("Invalid DEL command format");
+        }
+
+        std::string key = requestArray[1].value;
+        size_t num_deleted = database.erase(key);
+        std::string response = ":" + std::to_string(num_deleted) + "\r\n";
+        send(fd, response.c_str(), response.length(), 0);
+    }
+    catch (const std::exception& e) {
+        std::string error_response = "-Error: " + std::string(e.what()) + "\r\n";
+        send(fd, error_response.c_str(), error_response.length(), 0);
+    }
+}
+

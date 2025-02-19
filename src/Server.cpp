@@ -23,6 +23,8 @@ void processRequest(int fd, const RESPElement& requestArr, Handler & handler) {
         handler.handleGet(fd, requestArray);
     } else if (command == "EXISTS") {
         handler.handleExists(fd, requestArray);
+    } else if (command == "DEL") {
+        handler.handleDel(fd, requestArray);
     } else {
         std::string response = "-ERR unknown command\r\n";
         send(fd, response.c_str(), response.length(), 0);
