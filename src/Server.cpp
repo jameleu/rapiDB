@@ -8,7 +8,30 @@
 #include <arpa/inet.h>
 #include <netdb.h>
 #define BUFFER_SIZE 128
+void handle_requests(int fd)
+{
+  std::string buffer;  // dynamic buffer so can receive longer messages
+  char temp[BUFFER_SIZE]; // temporary buffer for immediate receive with recv
+  while (true)
+  {
+    memset(temp, 0, sizeof(temp));
+    int bytes_received = recv(fd, temp, sizeof(temp)-1,0);
+    if (bytes_received <= 0)
+    {
+      std::cerr << "Client disconnected or error occurred.\n";
+      break;
+    }
+    
+    buffer.append(temp, bytes_received);
 
+    //if has ping, then send pong
+    size_t pos = buffer.find("*1\r\n$4\r\nping\r\n");
+    if (pos != std::string::npos) {
+        send(fd, "+PONG\r\n", 7, 0);
+        buffer.erase(0, pos + 14);  // Remove processed message
+    }
+  }
+}
 int main(int argc, char **argv) {
   // Flush
   std::cout << std::unitbuf;
@@ -53,7 +76,10 @@ int main(int argc, char **argv) {
     std::cerr << "TCP Handshake failed\n";
     return 1;
   }
-
+  std::cout << "Client connected\n";
+  std::string pong = "+PONG\r\n";  // + is simple string in Redis, carriage return, new line
+  
+  handle_requests(client_fd);
   close(server_fd);
 
   return 0;
