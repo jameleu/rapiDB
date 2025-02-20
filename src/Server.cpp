@@ -29,6 +29,10 @@ void processRequest(int fd, const RESPElement& requestArr, Handler & handler) {
         handler.handleIncr(fd, requestArray);
     } else if (command == "DECR") {
         handler.handleDecr(fd, requestArray);
+    }  else if (command == "LPUSH") {
+        handler.handleLPush(fd, requestArray);
+    } else if (command == "RPUSH") {
+        handler.handleRPush(fd, requestArray);
     } else {
         std::string response = "-ERR unknown command\r\n";
         send(fd, response.c_str(), response.length(), 0);

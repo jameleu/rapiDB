@@ -178,3 +178,47 @@ void Handler::handleDecr(int fd, const std::vector<RESPElement>& requestArray) {
         send(fd, error_response.c_str(), error_response.length(), 0);
     }
 }
+
+// LPUSH key value [value ...]
+// Inserts values at the head (left side) of the list.
+// Returns size of array after changes
+void Handler::handleLPush(int fd, const std::vector<RESPElement>& requestArray) {
+    try {
+        if (requestArray.size() < 3) {
+            throw std::runtime_error("Invalid LPUSH command format");
+        }
+        std::string key = requestArray[1].value;
+        // In Redis, LPUSH inserts values one by one, so the final order is reversed relative to the command order.
+        for (size_t i = 2; i < requestArray.size(); i++) {
+            listDatabase[key].insert(listDatabase[key].begin(), requestArray[i].value);
+        }
+        size_t newLength = listDatabase[key].size();
+        std::string response = ":" + std::to_string(newLength) + "\r\n";
+        send(fd, response.c_str(), response.length(), 0);
+    } catch (const std::exception& e) {
+        std::string error_response = "-Error: " + std::string(e.what()) + "\r\n";
+        send(fd, error_response.c_str(), error_response.length(), 0);
+    }
+}
+
+// RPUSH key value [value ...]
+// Appends values to the tail (right side) of the list.
+// Returns new length of array at key value
+void Handler::handleRPush(int fd, const std::vector<RESPElement>& requestArray) {
+    try {
+        if (requestArray.size() < 3) {
+            throw std::runtime_error("Invalid RPUSH command format");
+        }
+        std::string key = requestArray[1].value;
+        for (size_t i = 2; i < requestArray.size(); i++) {  // start after key in command list
+            listDatabase[key].push_back(requestArray[i].value);
+        }
+        size_t newLength = listDatabase[key].size();
+        std::string response = ":" + std::to_string(newLength) + "\r\n";
+        send(fd, response.c_str(), response.length(), 0);
+    } catch (const std::exception& e) {
+        std::string error_response = "-Error: " + std::string(e.what()) + "\r\n";
+        send(fd, error_response.c_str(), error_response.length(), 0);
+    }
+}
+
