@@ -28,7 +28,7 @@ public:
     bool exist(const std::string& key);
 
     // Erase (delete) a key from both stores.
-    void erase(const std::string& key);
+    bool erase(const std::string& key);
 
     // Increment the numeric value stored at key.
     // If key doesn't exist, set it to "1".
@@ -50,6 +50,9 @@ public:
 
     // Return a subset of the list stored at key, between start and stop (inclusive).
     std::vector<std::string> lrange(const std::string& key, int start, int stop);
+
+    // get size of string/list. 0 if does not exist
+    size_t sizeOf(const std::string& key);
 
 private:
     DB() {}

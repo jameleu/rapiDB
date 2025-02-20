@@ -5,11 +5,14 @@
 #include <vector>
 #include <unordered_map>
 #include "resp_parser.hpp" 
+#include "db.hpp"
 
 class Handler {
+    // wrapper functions for db that do resp conversion/handling, calling on parser for input
+    // + formatting output
 public:
-    Handler() = default;
-
+    Handler();
+    void sendErrorMessage(int fd, const std::string& errorMessage);
     void handleSet(int fd, const std::vector<RESPElement>& requestArray);
     void handleGet(int fd, const std::vector<RESPElement>& requestArray);
     void handleExists(int fd, const std::vector<RESPElement>& requestArray);
@@ -21,7 +24,7 @@ public:
     void handleLRange(int fd, const std::vector<RESPElement>& requestArray);
 
 private:
-    std::unordered_map<std::string, std::string> database;
+    DB* db;  // singleton db
 };
 
 #endif // HANDLER_HPP
