@@ -222,3 +222,55 @@ void Handler::handleRPush(int fd, const std::vector<RESPElement>& requestArray) 
     }
 }
 
+// LRANGE key start stop
+// Returns the list elements between indices start and stop (inclusive).
+void Handler::handleLRange(int fd, const std::vector<RESPElement>& requestArray) {
+    try {
+        if (requestArray.size() != 4) {
+            throw std::runtime_error("Invalid LRANGE command format");
+        }
+        std::string key = requestArray[1].value;
+        int start = std::stoi(requestArray[2].value);
+        int stop  = std::stoi(requestArray[3].value);
+
+        auto it = listDatabase.find(key);
+        std::vector<std::string> list;
+
+        // get list if it exists
+        if (it != listDatabase.end()) {
+            list = it->second;
+        }
+
+        int listSize = list.size();
+        // if negative, give it as IDX from end
+        if (start < 0) start = listSize + start;
+        // if negative, give it as IDX from end
+        if (stop < 0) stop = listSize + stop;
+
+        // Hard clamps in case list size is still not big enough for negatives
+        if (start < 0) start = 0;
+        // or if given end is out of bounds still
+        if (stop >= listSize) stop = listSize - 1;
+
+        // if list does not exist, return empty
+        if (start > stop || listSize == 0) {
+            std::string response = "*0\r\n";
+            send(fd, response.c_str(), response.length(), 0);
+            return;
+        }
+
+        int count = stop - start + 1;
+        std::ostringstream oss;
+        oss << "*" << count << "\r\n";
+        for (int i = start; i <= stop; i++) {
+            std::string element = list[i];
+            oss << "$" << element.length() << "\r\n" << element << "\r\n";
+        }
+        std::string response = oss.str();
+        send(fd, response.c_str(), response.length(), 0);
+
+    } catch (const std::exception& e) {
+        std::string error_response = "-Error: " + std::string(e.what()) + "\r\n";
+        send(fd, error_response.c_str(), error_response.length(), 0);
+    }
+}

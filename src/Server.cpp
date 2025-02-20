@@ -33,6 +33,8 @@ void processRequest(int fd, const RESPElement& requestArr, Handler & handler) {
         handler.handleLPush(fd, requestArray);
     } else if (command == "RPUSH") {
         handler.handleRPush(fd, requestArray);
+    } else if (command == "LRANGE") {
+        handler.handleLRange(fd, requestArray);
     } else {
         std::string response = "-ERR unknown command\r\n";
         send(fd, response.c_str(), response.length(), 0);
