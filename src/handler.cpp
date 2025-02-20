@@ -5,6 +5,9 @@
 #include <cstdlib>
 #include <sys/socket.h>
 
+// Argument format: SET key [keys...]
+// Sets value at key, overwriting if applicable. Resets TTL if applicable.
+// Returns OK if successful
 void Handler::handleSet(int fd, const std::vector<RESPElement>& requestArray) {
     try {
         if (requestArray.size() != 3) {
@@ -27,6 +30,8 @@ void Handler::handleSet(int fd, const std::vector<RESPElement>& requestArray) {
     }
 }
 
+// Argument format: GET key [keys...]
+// returns value at key. returns error otherwise if not string
 void Handler::handleGet(int fd, const std::vector<RESPElement>& requestArray) {
     try {
         if (requestArray.size() != 2) {
@@ -53,15 +58,25 @@ void Handler::handleGet(int fd, const std::vector<RESPElement>& requestArray) {
     }
 }
 
+// Argument format: EXISTS key [keys...]
+// Shows if key exists
+// Returns 1 if exists (sums up for each key given, even duplicates)
 void Handler::handleExists(int fd, const std::vector<RESPElement>& requestArray) {
     try {
         if (requestArray.size() != 2) {
             throw std::runtime_error("Invalid EXISTS command format");
         }
 
-        std::string key = requestArray[1].value;
-        bool exists = (database.find(key) != database.end());
-        std::string response = ":" + std::to_string(exists ? 1 : 0) + "\r\n";
+        std::string key;
+        int num_found = 0;
+        for (size_t i = 1; i < requestArray.size(); i++) {
+            key = requestArray[1].value;
+            if (database.find(key) != database.end())
+            {
+                num_found++;
+            }
+        }
+        std::string response = ":" + std::to_string(num_found) + "\r\n";
         send(fd, response.c_str(), response.length(), 0);
     }
     catch (const std::exception& e) {
@@ -70,14 +85,21 @@ void Handler::handleExists(int fd, const std::vector<RESPElement>& requestArray)
     }
 }
 
+// Argument format: DEL key [keys...]
+// Deletes key value pair. Ignores key if it does not exist
+// Returns number of keys deleted
 void Handler::handleDel(int fd, const std::vector<RESPElement>& requestArray) {
     try {
         if (requestArray.size() != 2) {
             throw std::runtime_error("Invalid DEL command format");
         }
-
-        std::string key = requestArray[1].value;
-        size_t num_deleted = database.erase(key);
+        int num_deleted = 0;
+        std::string key;
+        for (size_t i = 1; i < requestArray.size(); i++) {
+            key = requestArray[i].value;
+            database.erase(key);
+            num_deleted++;
+        }
         std::string response = ":" + std::to_string(num_deleted) + "\r\n";
         send(fd, response.c_str(), response.length(), 0);
     }
@@ -87,6 +109,9 @@ void Handler::handleDel(int fd, const std::vector<RESPElement>& requestArray) {
     }
 }
 
+// Argument format: INCR key
+// Increments value by one. Returns error if is not intenger
+// Returns new value of key
 void Handler::handleIncr(int fd, const std::vector<RESPElement>& requestArray) {
     try {
         if (requestArray.size() != 2) {
@@ -97,9 +122,15 @@ void Handler::handleIncr(int fd, const std::vector<RESPElement>& requestArray) {
         auto it = database.find(key);
 
         if (it != database.end()) {
-            int64_t value = std::stoll(it->second);
-            value++;
-            it->second = std::to_string(value);
+            try {
+                int64_t value = std::stoll(it->second);
+                value++; 
+                it->second = std::to_string(value);
+            } catch (const std::exception&) {
+                std::string error_response = "-Error: Value is not an integer\r\n";
+                send(fd, error_response.c_str(), error_response.length(), 0);
+                return;
+            }
         } else {
             database[key] = "1";
         }
@@ -113,6 +144,9 @@ void Handler::handleIncr(int fd, const std::vector<RESPElement>& requestArray) {
     }
 }
 
+// Argument format: DECR key
+// Decrements value by one. Returns error if is not intenger
+// Returns new value of key
 void Handler::handleDecr(int fd, const std::vector<RESPElement>& requestArray) {
     try {
         if (requestArray.size() != 2) {
@@ -123,9 +157,15 @@ void Handler::handleDecr(int fd, const std::vector<RESPElement>& requestArray) {
         auto it = database.find(key);
 
         if (it != database.end()) {
-            int64_t value = std::stoll(it->second);
-            value--;
-            it->second = std::to_string(value);
+            try {
+                int64_t value = std::stoll(it->second);
+                value--; 
+                it->second = std::to_string(value);
+            } catch (const std::exception&) {
+                std::string error_response = "-Error: Value is not an integer\r\n";
+                send(fd, error_response.c_str(), error_response.length(), 0);
+                return;
+            }
         } else {
             database[key] = "-1";
         }
