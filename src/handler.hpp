@@ -12,7 +12,6 @@ class Handler {
     // + formatting output
 public:
     Handler();
-    void sendErrorMessage(int fd, const std::string& errorMessage);
     void handleSet(int fd, const std::vector<RESPElement>& requestArray);
     void handleGet(int fd, const std::vector<RESPElement>& requestArray);
     void handleExists(int fd, const std::vector<RESPElement>& requestArray);
@@ -25,6 +24,7 @@ public:
 
 private:
     DB* db;  // singleton db
+    void sendErrorMessage(int fd, const std::string& errorMessage);
 };
 
 #endif // HANDLER_HPP

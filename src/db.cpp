@@ -7,6 +7,36 @@ DB& DB::getInstance() {
     return instance;
 }
 
+// check if expired and erase if so, then throw error
+void DB::throwDeleteIfExpired(const std::string& key) {
+    if (isExpired(key)) {
+        erase(key);
+        throw std::runtime_error("Key has expired");
+    }
+}
+
+// check Is Expired
+bool DB::isExpired(const std::string& key) {
+    std::lock_guard<std::mutex> lock(expireMutex_);
+    auto it = expirationStore_.find(key);
+    if (it == expirationStore_.end()) return false;
+    auto now = std::chrono::system_clock::now();
+
+    auto unixTimeMs = std::chrono::duration_cast<std::chrono::milliseconds>(now.time_since_epoch()).count();
+
+    return unixTimeMs > it->second;
+}
+void DB::setExpirationTime(const std::string& key, long expiry) {
+    std::lock_guard<std::mutex> lock(expireMutex_);
+    expirationStore_[key] = expiry;
+}
+
+// set expiration as infinite
+void DB::setExpirationInf(const std::string& key) {
+    std::lock_guard<std::mutex> lock(expireMutex_);
+    expirationStore_.erase(key);
+}
+
 void DB::set(const std::string& key, const std::string& value) {
     std::scoped_lock strLock(stringMutex_, listMutex_);  // avoids deadlocks
 
@@ -14,6 +44,7 @@ void DB::set(const std::string& key, const std::string& value) {
     listStore_.erase(key);
 
     stringStore_[key] = value;
+
 }
 
 std::string DB::get(const std::string& key) {

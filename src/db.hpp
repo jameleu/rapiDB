@@ -54,16 +54,29 @@ public:
     // get size of string/list. 0 if does not exist
     size_t sizeOf(const std::string& key);
 
+    // delete entry then throw if expired
+    void throwDeleteIfExpired(const std::string& key);
+    
+    // check if expired (used by above function)
+    bool isExpired(const std::string& key);
+
+    // set time of expiry
+    void setExpirationTime(const std::string& key, long expiry);
+    
+    //set it as infinite (remove)
+    void setExpirationInf(const std::string& key);
+
 private:
     DB() {}
 
     // one for string values, one for list values.
     std::unordered_map<std::string, std::string> stringStore_;
     std::unordered_map<std::string, std::vector<std::string>> listStore_;
+    std::unordered_map<std::string, long long> expirationStore_;
 
-    // One mutex per store.
     mutable std::mutex stringMutex_;
     mutable std::mutex listMutex_;
+    mutable std::mutex expireMutex_;
 };
 
 #endif // DB_HPP

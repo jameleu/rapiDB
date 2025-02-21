@@ -15,12 +15,15 @@ void Handler::sendErrorMessage(int fd, const std::string& errorMessage) {
     send(fd, redisError.c_str(), redisError.length(), 0);
 }
 
-// Argument format: SET key [keys...]
+// only expiry-sensitive functions: get, incr, decr, exists. lists cannot expire. only single-values
+
+// Argument format: SET key value expiry
+// expiry is unix timestamp (can be seconds or milliseconds; no relative support for now)
 // Sets value at key, overwriting if applicable. Resets TTL if applicable.
 // Returns OK if successful
 void Handler::handleSet(int fd, const std::vector<RESPElement>& requestArray) {
     try {
-        if (requestArray.size() != 3) {
+        if (requestArray.size() > 4 || requestArray.size() < 2) {
             throw std::runtime_error("Invalid SET command format");
         }
 
@@ -29,7 +32,16 @@ void Handler::handleSet(int fd, const std::vector<RESPElement>& requestArray) {
         std::string value = requestArray[2].value;
 
         db->set(key, value);
-
+        if (requestArray.size() == 4)
+        {
+            std::string timestampStr = requestArray[3].value;
+            long long timestamp = std::stoll(timestampStr);
+            db->setExpirationTime(key, timestamp);
+        }
+        else // set expire time as infinite
+        {
+            db->setExpirationInf(key);
+        }
         std::string response = "+OK\r\n";
         send(fd, response.c_str(), response.length(), 0);
     }
@@ -48,7 +60,11 @@ void Handler::handleGet(int fd, const std::vector<RESPElement>& requestArray) {
         }
 
         std::string key = requestArray[1].value;
+        db->throwDeleteIfExpired(key);  // better to have error than null string
+        // OG redis has null string but that is not descriptive
+
         std::string value = db->get(key);
+
         std::string response = "$" + std::to_string(value.length()) + "\r\n" + value + "\r\n";
         send(fd, response.c_str(), response.length(), 0);
     
@@ -72,6 +88,14 @@ void Handler::handleExists(int fd, const std::vector<RESPElement>& requestArray)
         int num_found = 0;
         for (size_t i = 1; i < requestArray.size(); i++) {
             key = requestArray[i].value;
+
+            // delete if expired; don't count as exist
+            try {
+                db->throwDeleteIfExpired(key);
+            } catch (const std::exception& e) {
+                continue;
+            }
+            
             if (db->exist(key))
             {
                 num_found++;
@@ -122,6 +146,9 @@ void Handler::handleIncr(int fd, const std::vector<RESPElement>& requestArray) {
         }
 
         std::string key = requestArray[1].value;
+
+        db->throwDeleteIfExpired(key);
+
         int new_val = db->incr(key);        
 
         std::string response = ":" + std::to_string(new_val) + "\r\n";
@@ -143,6 +170,9 @@ void Handler::handleDecr(int fd, const std::vector<RESPElement>& requestArray) {
         }
 
         std::string key = requestArray[1].value;
+
+        db->throwDeleteIfExpired(key);
+
         int new_val = db->incr(key);        
 
         std::string response = ":" + std::to_string(new_val) + "\r\n";
