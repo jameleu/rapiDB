@@ -1,10 +1,152 @@
 #include "DB.hpp"
 #include <sstream>
 #include <cstdlib>
+#include <cstdint>
+#include <fstream>
+#include <iostream>
 
 DB& DB::getInstance() {
     static DB instance;  // singleton
     return instance;
+}
+
+// start up db -> load from rdb file
+DB::DB() {
+    loadRDB();
+}
+
+// shut down to db -> save to rdb file
+DB::~DB() {
+    saveRDB();
+}
+
+// write string to ofstream:    length stringS
+void DB::writeString(std::ofstream &out, const std::string &s) {
+    uint64_t length = s.size();
+    out.write(reinterpret_cast<const char*>(&length), sizeof(length));
+    out.write(s.data(), length);
+}
+
+// read string from ifstream
+// get length (first space delimited item)
+// then read that length of chars next for the string
+std::string DB::readString(std::ifstream &in) {
+    uint64_t length = 0;
+    in.read(reinterpret_cast<char*>(&length), sizeof(length));
+    std::string s(length, '\0');
+    in.read(&s[0], length);
+    return s;
+}
+
+// Save the database state to dump.rdb
+void DB::saveRDB() {
+    std::ofstream out("dump.rdb", std::ios::binary);
+    if (!out.is_open()) {
+        std::cerr << "Failed to open dump.rdb for saving." << std::endl;
+        return;
+    }
+    
+    // for strings
+    {
+        std::scoped_lock strLock(stringMutex_, expireMutex_);  // avoids deadlocks + nested locks
+        uint64_t numStrings = stringStore_.size();
+        out.write(reinterpret_cast<const char*>(&numStrings), sizeof(numStrings));
+        for (const auto& pair : stringStore_) {
+            // Write key and value using length-prefixed format.
+            writeString(out, pair.first);
+            writeString(out, pair.second);
+            
+            // Write expiration (if any). Use -1 to indicate no expiration.
+            int64_t expiration = -1;
+            if (expirationStore_.find(pair.first) != expirationStore_.end())
+                expiration = expirationStore_[pair.first];
+            out.write(reinterpret_cast<const char*>(&expiration), sizeof(expiration));
+        }
+    }
+    
+    // for lists
+    {
+        std::scoped_lock strLock(listMutex_, expireMutex_);  // avoids deadlocks + nested locks
+        uint64_t numLists = listStore_.size();
+        out.write(reinterpret_cast<const char*>(&numLists), sizeof(numLists));
+        for (const auto& pair : listStore_) {
+            // Write key using length-prefixed format.
+            writeString(out, pair.first);
+            
+            // Write number of elements in the list.
+            uint64_t numElements = pair.second.size();
+            out.write(reinterpret_cast<const char*>(&numElements), sizeof(numElements));
+            
+            // Write each list element.
+            for (const auto &element : pair.second) {
+                writeString(out, element);
+            }
+            
+            // Write expiration for this key; -1 means no expiration.
+            int64_t expiration = -1;
+           
+            if (expirationStore_.find(pair.first) != expirationStore_.end())
+                expiration = expirationStore_[pair.first];
+
+            out.write(reinterpret_cast<const char*>(&expiration), sizeof(expiration));
+        }
+    }
+    std::cout << "DB saved to dump.rdb" << std::endl;
+}
+
+// Load the database state to dump.rdb
+void DB::loadRDB() {
+    std::ifstream in("dump.rdb", std::ios::binary);
+    if (!in.is_open()) {
+        std::cerr << "No RDB file found, starting with an empty DB." << std::endl;
+        return;
+    }
+    
+    // for strings
+    {
+        std::scoped_lock strLock(stringMutex_, expireMutex_);  // avoids deadlocks + nested locks
+        uint64_t numStrings = 0;
+        in.read(reinterpret_cast<char*>(&numStrings), sizeof(numStrings));
+        for (uint64_t i = 0; i < numStrings; ++i) {
+            std::string key = readString(in);  // read length, then length of that for key
+            std::string value = readString(in);
+            int64_t expiration;
+            in.read(reinterpret_cast<char*>(&expiration), sizeof(expiration));
+            
+            stringStore_[key] = value;
+            if (expiration != -1) {
+                expirationStore_[key] = expiration;
+            }
+        }
+    }
+    // for lists
+    {
+        std::scoped_lock strLock(listMutex_, expireMutex_);  // avoids deadlocks + nested locks
+        uint64_t numLists = 0;
+        in.read(reinterpret_cast<char*>(&numLists), sizeof(numLists));
+        for (uint64_t i = 0; i < numLists; ++i) {
+            std::string key = readString(in);  // read length, then length of that for key
+            
+            // Read number of list elements.
+            uint64_t numElements = 0;
+            in.read(reinterpret_cast<char*>(&numElements), sizeof(numElements));
+            
+            std::vector<std::string> elements;
+            for (uint64_t j = 0; j < numElements; ++j) {
+                std::string element = readString(in);
+                elements.push_back(element);
+            }
+            
+            int64_t expiration;
+            in.read(reinterpret_cast<char*>(&expiration), sizeof(expiration));
+            
+            listStore_[key] = elements;
+            if (expiration != -1) {
+                expirationStore_[key] = expiration;
+            }
+        }
+    }
+    std::cout << "DB loaded from dump.rdb" << std::endl;
 }
 
 // check if expired and erase if so, then throw error
