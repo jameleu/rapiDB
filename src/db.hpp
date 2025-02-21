@@ -12,7 +12,6 @@ public:
     // Get the singleton instance.
     static DB& getInstance();
 
-    // Delete copy constructor and assignment operator.
     DB(const DB&) = delete;
     DB& operator=(const DB&) = delete;
 
@@ -67,7 +66,8 @@ public:
     void setExpirationInf(const std::string& key);
 
 private:
-    DB() {}
+    DB();
+    ~DB();
 
     // one for string values, one for list values.
     std::unordered_map<std::string, std::string> stringStore_;
@@ -77,6 +77,14 @@ private:
     mutable std::mutex stringMutex_;
     mutable std::mutex listMutex_;
     mutable std::mutex expireMutex_;
+
+    void loadRDB();
+    void saveRDB();
+
+    void writeString(std::ofstream &out, const std::string &s);
+    std::string readString(std::ifstream &in);
+
+
 };
 
 #endif // DB_HPP
