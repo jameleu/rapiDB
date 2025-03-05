@@ -65,6 +65,8 @@ public:
     //set it as infinite (remove)
     void setExpirationInf(const std::string& key);
 
+    bool loadRDB(const std::string& fileName = "dump.rdb");
+    bool saveRDB(const std::string& fileName = "dump.rdb");
 private:
     DB();
     ~DB();
@@ -78,8 +80,6 @@ private:
     mutable std::mutex listMutex_;
     mutable std::mutex expireMutex_;
 
-    void loadRDB();
-    void saveRDB();
 
     void writeString(std::ofstream &out, const std::string &s);
     std::string readString(std::ifstream &in);

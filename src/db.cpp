@@ -39,11 +39,11 @@ std::string DB::readString(std::ifstream &in) {
 }
 
 // Save the database state to dump.rdb
-void DB::saveRDB() {
-    std::ofstream out("dump.rdb", std::ios::binary);
+bool DB::saveRDB(const std::string& fileName) {
+    std::ofstream out(fileName, std::ios::binary);
     if (!out.is_open()) {
         std::cerr << "Failed to open dump.rdb for saving." << std::endl;
-        return;
+        return false;
     }
     
     // for strings
@@ -92,14 +92,15 @@ void DB::saveRDB() {
         }
     }
     std::cout << "DB saved to dump.rdb" << std::endl;
+    return true;
 }
 
 // Load the database state to dump.rdb
-void DB::loadRDB() {
-    std::ifstream in("dump.rdb", std::ios::binary);
+bool DB::loadRDB(const std::string& fileName) {
+    std::ifstream in(fileName, std::ios::binary);
     if (!in.is_open()) {
         std::cerr << "No RDB file found, starting with an empty DB." << std::endl;
-        return;
+        return false;
     }
     
     // for strings
@@ -145,6 +146,7 @@ void DB::loadRDB() {
                 expirationStore_[key] = expiration;
             }
         }
+        return true;
     }
     std::cout << "DB loaded from dump.rdb" << std::endl;
 }
