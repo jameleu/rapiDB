@@ -76,7 +76,7 @@ Rest are master only (writes, save, wait)
 ## Challenges
 * Dependency Management: Dealing with vcpkg dependencies and configuring the toolchain properly was finicky, requiring knowledge of CMake flags and syntax.
 * Networking and Socket Programming: Had to learn how to configure sockets, bind to a port, listen for connections, and handle TCP communication.
-* Parser: Needed to figure out RESP. Also how to escape characters without adding excessive complexity. Did 
+* Parser: Needed to figure out RESP. Also how to escape characters without adding excessive complexity. Did explicit enumerated size before each word with \r\n delimiters
 * Buffer Handling: Receiving data with recv required handling dynamic buffers and ensuring correct memory management, as it doesn’t add null terminators, which made string manipulation more difficult.
 * OOP, Concurrency and Thread Safety: Challenge was how to represent DB. Researched, and with OOP, can use singleton. Encountered issues with concurrency while using a Singleton pattern for managing the database. Locking mechanisms (e.g., shared and scoped locks) were needed to prevent data races and deadlocks.
 * Data Storage Design: Needed to represent single value and lists in DB. How to do that with static types in C++? Could either do polymorphism or Strategy Pattern, but both require too much coding and did not need flexibility for only 2 types of data. Just made two hash maps.
